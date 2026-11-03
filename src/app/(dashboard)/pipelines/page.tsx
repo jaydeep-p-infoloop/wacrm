@@ -7,6 +7,7 @@ import { PipelineBoard } from "@/components/pipelines/pipeline-board";
 import { PipelineSettings } from "@/components/pipelines/pipeline-settings";
 import { DealForm } from "@/components/pipelines/deal-form";
 import { PipelineAnalytics } from "@/components/pipelines/pipeline-analytics";
+import { statusForStageMove } from "@/lib/pipelines/stage-outcome";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,8 +45,13 @@ const SPEC_DEFAULT_STAGES = [
   { nameKey: "qualified", color: "#eab308", position: 1 }, // yellow
   { nameKey: "proposalSent", color: "#f97316", position: 2 }, // orange
   { nameKey: "negotiation", color: "#8b5cf6", position: 3 }, // purple
-  { nameKey: "won", color: "#22c55e", position: 4 }, // green
-] as const;
+  { nameKey: "won", color: "#22c55e", position: 4, outcome: "won" }, // green
+] as const satisfies ReadonlyArray<{
+  nameKey: string;
+  color: string;
+  position: number;
+  outcome?: "won" | "lost";
+}>;
 
 export default function PipelinesPage() {
   const t = useTranslations("Pipelines.page");
@@ -137,6 +143,7 @@ export default function PipelinesPage() {
       name: t(`defaultStages.${s.nameKey}`),
       color: s.color,
       position: s.position,
+      outcome: "outcome" in s ? s.outcome : null,
     }));
     await supabase.from("pipeline_stages").insert(stagesPayload);
 
@@ -219,20 +226,32 @@ export default function PipelinesPage() {
 
   const handleDealMoved = useCallback(
     async (dealId: string, newStageId: string) => {
+      const deal = deals.find((d) => d.id === dealId);
+      // Dropping into the won/lost stage (or back out of it) keeps
+      // deals.status in step with the board, so analytics and the
+      // dashboard agree with what the user sees.
+      const nextStatus = statusForStageMove(
+        deal?.status,
+        stages.find((s) => s.id === deal?.stage_id),
+        stages.find((s) => s.id === newStageId),
+      );
+      const patch: Partial<Deal> = { stage_id: newStageId };
+      if (nextStatus) patch.status = nextStatus;
+
       // Optimistic update — board already animated; just persist.
       setDeals((prev) =>
-        prev.map((d) => (d.id === dealId ? { ...d, stage_id: newStageId } : d)),
+        prev.map((d) => (d.id === dealId ? { ...d, ...patch } : d)),
       );
       const { error } = await supabase
         .from("deals")
-        .update({ stage_id: newStageId })
+        .update(patch)
         .eq("id", dealId);
       if (error) {
         toast.error(t("toastFailedMoveDeal"));
         refreshDeals();
       }
     },
-    [supabase, refreshDeals, t],
+    [supabase, refreshDeals, t, deals, stages],
   );
 
   const handleAddDeal = useCallback(
@@ -287,6 +306,7 @@ export default function PipelinesPage() {
       name: t(`defaultStages.${s.nameKey}`),
       color: s.color,
       position: s.position,
+      outcome: "outcome" in s ? s.outcome : null,
     }));
     await supabase.from("pipeline_stages").insert(stagesPayload);
 

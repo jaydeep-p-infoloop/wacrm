@@ -163,6 +163,41 @@ BEGIN
     RAISE EXCEPTION 'anon can execute dashboard_overview — migration 059 grants are wrong';
   END IF;
 
+  -- 060: stage outcome column for won/lost board sync.
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'pipeline_stages'
+      AND column_name = 'outcome'
+  ) THEN
+    RAISE EXCEPTION 'pipeline_stages.outcome is missing — migration 060 did not apply';
+  END IF;
+
+  -- 061: the app's roles can reach the tables (RLS still filters rows)
+  -- and the grant didn't undo the 027 / 054 hardening. Every public
+  -- table must have RLS on, since 061 grants on all of them.
+  IF NOT has_table_privilege('authenticated', 'public.contacts', 'SELECT,INSERT,UPDATE,DELETE')
+     OR NOT has_table_privilege('service_role', 'public.messages', 'SELECT,INSERT,UPDATE,DELETE') THEN
+    RAISE EXCEPTION 'authenticated/service_role lack table privileges — migration 061 did not apply';
+  END IF;
+  IF has_table_privilege('anon', 'public.contacts', 'SELECT') THEN
+    RAISE EXCEPTION 'anon can SELECT public.contacts — table grants are too broad';
+  END IF;
+  IF has_column_privilege('authenticated', 'public.notifications', 'title', 'UPDATE')
+     OR NOT has_column_privilege('authenticated', 'public.notifications', 'read_at', 'UPDATE') THEN
+    RAISE EXCEPTION 'notifications column-level UPDATE hardening (027) is not in place';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.pending_message_statuses', 'SELECT') THEN
+    RAISE EXCEPTION 'pending_message_statuses is readable by authenticated — 054 hardening lost';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    WHERE c.relnamespace = 'public'::regnamespace
+      AND c.relkind IN ('r', 'p')
+      AND NOT c.relrowsecurity
+  ) THEN
+    RAISE EXCEPTION 'a public table has RLS disabled — unsafe with the 061 grants';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

@@ -377,12 +377,20 @@ export interface Pipeline {
   created_at: string;
 }
 
+/** Terminal outcome a stage represents (migration 060). */
+export type StageOutcome = 'won' | 'lost';
+
 export interface PipelineStage {
   id: string;
   pipeline_id: string;
   name: string;
   position: number;
   color: string;
+  /**
+   * When set, dragging a deal into this stage sets deals.status to the
+   * outcome (and dragging it out reopens it). NULL = ordinary stage.
+   */
+  outcome?: StageOutcome | null;
   created_at: string;
 }
 
