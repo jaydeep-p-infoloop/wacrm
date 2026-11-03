@@ -106,12 +106,12 @@ function LoginPageInner() {
         <CardContent>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             {linkErrorMessage && !error && (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
                 {linkErrorMessage}
               </div>
             )}
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
