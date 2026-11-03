@@ -173,6 +173,21 @@ html[data-theme="violet"] {
   --sidebar-ring: oklch(0.526 0.247 293);
 }
 
+/* OpsDeck brand accent (default). Deep product blue (≈ #2563eb). */
+html[data-theme="opsdeck"] {
+  --primary: oklch(0.546 0.22 263);
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-hover: oklch(0.6 0.2 263);
+  --primary-soft: oklch(0.546 0.22 263 / 0.1);
+  --primary-soft-2: oklch(0.546 0.22 263 / 0.18);
+  --ring: oklch(0.546 0.22 263);
+  --chart-1: oklch(0.546 0.22 263);
+  --chart-2: oklch(0.7 0.13 200);
+  --sidebar-primary: oklch(0.546 0.22 263);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.546 0.22 263);
+}
+
 html[data-theme="emerald"] {
   --primary: oklch(0.62 0.16 162);
   --primary-foreground: oklch(0.16 0.02 162);

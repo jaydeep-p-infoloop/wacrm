@@ -35,6 +35,7 @@ import {
   type InteractiveMessagePayload,
 } from '@/lib/whatsapp/interactive';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
+import { demoWhatsAppMessageId, isDemoMode } from '@/lib/demo-mode';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import {
   phoneVariants,
@@ -265,7 +266,12 @@ export async function sendMessageToConversation(
     .eq('account_id', accountId)
     .single();
 
-  if (configError || !config) {
+  // Demo mode: with no WhatsApp connection the message is recorded as
+  // sent locally instead of failing. A connected account always goes
+  // through Meta, flag or not (see src/lib/demo-mode.ts).
+  const demoSend = (configError || !config) && isDemoMode();
+
+  if ((configError || !config) && !demoSend) {
     throw new SendMessageError(
       'whatsapp_not_configured',
       'WhatsApp not configured. Please set up your WhatsApp integration first.',
@@ -273,10 +279,10 @@ export async function sendMessageToConversation(
     );
   }
 
-  const accessToken = decrypt(config.access_token);
+  const accessToken = demoSend ? '' : decrypt(config.access_token);
 
   // Self-heal legacy CBC ciphertexts. Fire-and-forget; idempotent.
-  if (isLegacyFormat(config.access_token)) {
+  if (!demoSend && isLegacyFormat(config.access_token)) {
     void db
       .from('whatsapp_config')
       .update({ access_token: encrypt(accessToken) })
@@ -414,36 +420,40 @@ export async function sendMessageToConversation(
   // back to the contact so the next send goes straight through.
   let waMessageId = '';
   let workingPhone = sendTarget;
-  try {
-    // Variants only make sense for a phone number — a BSUID is opaque
-    // and has exactly one correct form, so it gets a single attempt.
-    const variants = hasValidPhone ? phoneVariants(sanitizedPhone) : [sendTarget];
-    let lastError: unknown = null;
+  if (demoSend) {
+    waMessageId = demoWhatsAppMessageId();
+  } else {
+    try {
+      // Variants only make sense for a phone number — a BSUID is opaque
+      // and has exactly one correct form, so it gets a single attempt.
+      const variants = hasValidPhone ? phoneVariants(sanitizedPhone) : [sendTarget];
+      let lastError: unknown = null;
 
-    for (const variant of variants) {
-      try {
-        waMessageId = await attempt(variant);
-        workingPhone = variant;
-        lastError = null;
-        break;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!isRecipientNotAllowedError(message)) {
-          throw err;
+      for (const variant of variants) {
+        try {
+          waMessageId = await attempt(variant);
+          workingPhone = variant;
+          lastError = null;
+          break;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!isRecipientNotAllowedError(message)) {
+            throw err;
+          }
+          lastError = err;
+          console.warn(
+            `[send-message] variant "${variant}" rejected by Meta, trying next…`
+          );
         }
-        lastError = err;
-        console.warn(
-          `[send-message] variant "${variant}" rejected by Meta, trying next…`
-        );
       }
-    }
 
-    if (lastError) throw lastError;
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Unknown Meta API error';
-    console.error('[send-message] Meta send failed for all variants:', message);
-    throw new SendMessageError('meta_error', `Meta API error: ${message}`, 502);
+      if (lastError) throw lastError;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Unknown Meta API error';
+      console.error('[send-message] Meta send failed for all variants:', message);
+      throw new SendMessageError('meta_error', `Meta API error: ${message}`, 502);
+    }
   }
 
   if (hasValidPhone && workingPhone !== sanitizedPhone) {

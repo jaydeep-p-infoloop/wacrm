@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "opsdeck",
   "violet",
   "emerald",
   "cobalt",
@@ -23,7 +24,7 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "opsdeck";
 
 export const STORAGE_KEY = "wacrm.theme";
 
@@ -43,7 +44,8 @@ export const MODES = ["light", "dark"] as const;
 
 export type Mode = (typeof MODES)[number];
 
-export const DEFAULT_MODE: Mode = "dark";
+// OpsDeck defaults to light mode (B2B look); dark stays one click away.
+export const DEFAULT_MODE: Mode = "light";
 
 export const MODE_STORAGE_KEY = "wacrm.mode";
 
@@ -68,9 +70,15 @@ export interface ThemeMeta {
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
   {
+    id: "opsdeck",
+    name: "OpsDeck",
+    tagline: "The default — OpsDeck brand blue.",
+    swatch: "oklch(0.546 0.22 263)",
+  },
+  {
     id: "violet",
     name: "Violet",
-    tagline: "The default — confident, slightly playful.",
+    tagline: "Confident, slightly playful.",
     swatch: "oklch(0.526 0.247 293)",
   },
   {

@@ -14,6 +14,7 @@ import {
   STORAGE_KEY,
   THEME_IDS,
 } from "@/lib/themes";
+import { BRAND_NAME, BRAND_THEME_COLOR } from "@/lib/brand";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -30,8 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const metadata: Metadata = {
   title: {
-    default: "wacrm",
-    template: "%s — wacrm",
+    default: BRAND_NAME,
+    template: `%s — ${BRAND_NAME}`,
   },
   robots: {
     index: false,
@@ -48,7 +49,7 @@ const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: BRAND_THEME_COLOR,
   colorScheme: "dark light",
 };
 

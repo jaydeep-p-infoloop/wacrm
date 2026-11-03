@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
@@ -212,7 +212,8 @@ interface CapturedWrites {
 function sendPathDb(
   templateRows: unknown[],
   captured: CapturedWrites,
-  contact: Record<string, unknown> = { id: 'ct-1', phone: '+15551234567' }
+  contact: Record<string, unknown> = { id: 'ct-1', phone: '+15551234567' },
+  opts: { noConfig?: boolean } = {}
 ): SupabaseClient {
   const conversation = {
     id: 'cv-1',
@@ -242,7 +243,11 @@ function sendPathDb(
           if (table === 'conversations') {
             return { data: conversation, error: null };
           }
-          if (table === 'whatsapp_config') return { data: config, error: null };
+          if (table === 'whatsapp_config') {
+            return opts.noConfig
+              ? { data: null, error: { message: 'no rows' } }
+              : { data: config, error: null };
+          }
           if (table === 'messages') {
             return { data: { id: 'msg-1' }, error: null };
           }
@@ -528,5 +533,59 @@ describe('sendMessageToConversation — statuses that beat the insert', () => {
       'acct-1',
       'wamid.text'
     );
+  });
+});
+
+describe('sendMessageToConversation — demo mode (NEXT_PUBLIC_DEMO_MODE)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('still rejects an unconnected account when demo mode is off', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_MODE', '');
+    await expect(
+      sendMessageToConversation(
+        sendPathDb([], {}, undefined, { noConfig: true }),
+        'acct-1',
+        { conversationId: 'cv-1', messageType: 'text', contentText: 'hi' }
+      )
+    ).rejects.toMatchObject({ code: 'whatsapp_not_configured', status: 400 });
+  });
+
+  it('records the message as sent without calling Meta when unconnected', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_MODE', 'true');
+    const captured: CapturedWrites = {};
+    const { sendTextMessage } = await import('@/lib/whatsapp/meta-api');
+    vi.mocked(sendTextMessage).mockClear();
+
+    const result = await sendMessageToConversation(
+      sendPathDb([], captured, undefined, { noConfig: true }),
+      'acct-1',
+      { conversationId: 'cv-1', messageType: 'text', contentText: 'hi' }
+    );
+
+    expect(vi.mocked(sendTextMessage)).not.toHaveBeenCalled();
+    expect(result.whatsappMessageId).toMatch(/^demo-/);
+    expect(captured.message).toMatchObject({
+      status: 'sent',
+      content_text: 'hi',
+      sender_type: 'agent',
+    });
+    expect(captured.conversation).toMatchObject({ last_message_text: 'hi' });
+  });
+
+  it('sends through Meta for a connected account even with demo mode on', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_MODE', 'true');
+    const { sendTextMessage } = await import('@/lib/whatsapp/meta-api');
+    vi.mocked(sendTextMessage).mockClear();
+
+    const result = await sendMessageToConversation(
+      sendPathDb([], {}),
+      'acct-1',
+      { conversationId: 'cv-1', messageType: 'text', contentText: 'hi' }
+    );
+
+    expect(vi.mocked(sendTextMessage)).toHaveBeenCalledTimes(1);
+    expect(result.whatsappMessageId).toBe('wamid.text');
   });
 });

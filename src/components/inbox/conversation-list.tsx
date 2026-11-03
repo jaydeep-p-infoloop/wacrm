@@ -13,6 +13,7 @@ import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useTranslations } from "next-intl";
+import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -54,9 +55,11 @@ export function ConversationList({
   initialFilter = "all",
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
+  const { user } = useAuth();
   
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
+    { label: t("filterMine"), value: "mine" },
     { label: t("filterUnread"), value: "unread" },
     { label: t("filterWaiting"), value: "waiting" },
     { label: t("filterUnassigned"), value: "unassigned" },
@@ -168,7 +171,7 @@ export function ConversationList({
   }, [tags]);
 
   const filtered = useMemo(() => {
-    let result = applyInboxFilter(conversations, filter, now);
+    let result = applyInboxFilter(conversations, filter, now, user?.id);
 
     // Contact-based filters (tags via OR logic, exact company match).
     if (selectedTagIds.length > 0 || selectedCompany !== null) {
@@ -191,7 +194,7 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, now, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, now, search, selectedTagIds, selectedCompany, user?.id]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>

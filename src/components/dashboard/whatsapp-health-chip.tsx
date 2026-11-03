@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 
 import type { PhoneHealth } from '@/lib/whatsapp/phone-health'
 import { cn } from '@/lib/utils'
+import { isDemoMode } from '@/lib/demo-mode'
 
 const DOT_CLASS = {
   GREEN: 'bg-status-good',
@@ -41,15 +42,21 @@ export function WhatsAppHealthChip() {
         ? t('perDay', { count: format.number(health.limit.perDay, { notation: 'compact' }) })
         : null
 
-  const label =
-    health.state === 'disconnected'
+  // Demo mode with no WhatsApp connection: say so instead of a red
+  // "disconnected" chip (see src/lib/demo-mode.ts).
+  const demo = health.state === 'disconnected' && isDemoMode()
+
+  const label = demo
+    ? t('demo')
+    : health.state === 'disconnected'
       ? t('disconnected')
       : health.state === 'unavailable'
         ? t('unavailable')
         : [health.displayPhoneNumber, t(`quality.${health.quality}`), limit].filter(Boolean).join(' · ')
 
-  const dot =
-    health.state === 'connected' ? DOT_CLASS[health.quality] : health.state === 'disconnected' ? DOT_CLASS.RED : DOT_CLASS.UNKNOWN
+  const dot = demo
+    ? 'bg-primary'
+    : health.state === 'connected' ? DOT_CLASS[health.quality] : health.state === 'disconnected' ? DOT_CLASS.RED : DOT_CLASS.UNKNOWN
 
   return (
     <Link

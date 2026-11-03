@@ -93,3 +93,26 @@ describe("applyInboxFilter", () => {
     expect(list.map((c) => c.id)).toEqual(before);
   });
 });
+
+describe("applyInboxFilter — mine", () => {
+  const list = [
+    conv("a", { assigned_agent_id: "me" }),
+    conv("b", { assigned_agent_id: "me", status: "pending" }),
+    conv("c", { assigned_agent_id: "me", status: "closed" }),
+    conv("d", { assigned_agent_id: "someone-else" }),
+    conv("e"),
+  ];
+
+  it("keeps my open and pending conversations, drops closed and others'", () => {
+    expect(applyInboxFilter(list, "mine", NOW, "me").map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("returns nothing when the user isn't known yet", () => {
+    expect(applyInboxFilter(list, "mine", NOW, null)).toEqual([]);
+    expect(applyInboxFilter(list, "mine", NOW)).toEqual([]);
+  });
+
+  it("is accepted by parseInboxFilter", () => {
+    expect(parseInboxFilter("mine")).toBe("mine");
+  });
+});
